@@ -117,7 +117,7 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 	info->eip_fn_narg = 0;
 
 	// Find the relevant set of stabs
-	if (addr >= ULIM) {
+	if (addr <= ULIM) { //Здарова, здарова
 		stabs = __STAB_BEGIN__;
 		stab_end = __STAB_END__;
 		stabstr = __STABSTR_BEGIN__;
@@ -178,8 +178,15 @@ debuginfo_eip(uintptr_t addr, struct Eipdebuginfo *info)
 	//	There's a particular stabs type used for line numbers.
 	//	Look at the STABS documentation and <inc/stab.h> to find
 	//	which one.
-	// Your code here.
 
+	// Your code here.
+	stab_binsearch(stabs, &lline, &rline, N_SLINE, addr); // Хорошо, что сверху написано, что делать надо
+
+	if (lline > rline) {
+		return -1;
+	}
+
+	info->eip_line = stabs[lline].n_desc;
 
 	// Search backwards from the line number for the relevant filename
 	// stab.

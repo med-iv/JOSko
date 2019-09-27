@@ -24,6 +24,8 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+    { "hello", "Display hello", mon_hello },
+    { "backtrace", "Display backtrace", mon_backtrace},
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -60,9 +62,36 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 }
 
 int
+mon_hello() 
+{
+    cprintf("Hello, world!\n");
+    return 0;
+}
+
+int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+	uint32_t *ebp;
+
+	struct Eipdebuginfo info;
+
+	ebp = (uint32_t *) read_ebp(); // error: assignment makes pointer from integer without a cast -Werror=int-conversion
+
+	cprintf("Stack backtrace:\n");
+
+	while (ebp) {
+		cprintf("  ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n",
+				(uint32_t) ebp, ebp[1], ebp[2], ebp[3], ebp[4], ebp[5], ebp[6]);
+
+		debuginfo_eip(ebp[1], &info);
+
+		cprintf("\t%s:%d: %.*s+%u\n", info.eip_file, info.eip_line, info.eip_fn_namelen,
+				info.eip_fn_name, ebp[1] - info.eip_fn_addr);
+
+		ebp = (uint32_t *) ebp[0];
+	}
+
 	return 0;
 }
 
