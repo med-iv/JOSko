@@ -216,16 +216,17 @@ uintptr_t
 find_function(const char * const fname)
 {
 	const struct Stab *stabs = __STAB_BEGIN__, *stab_end = __STAB_END__;
-	const char *stabstr = __STABSTR_BEGIN__; //*stabstr_end = __STABSTR_END__;
+	const char *stabstr = __STABSTR_BEGIN__;
+	const struct Stab *stab;
+	int fname_len;
 
-	//LAB 3: Your code here.
-
-	for (const struct Stab *stab = stabs; stab < stab_end; ++stab) {
-		if (stab->n_type == N_FUN && !strcmp(fname, &stabstr[stab->n_strx])) {
+	for (stab = stabs; stab < stab_end; stab++) {
+		if (stab->n_type != N_FUN)
+			continue;
+		fname_len = strfind(&stabstr[stab->n_strx], ':') - &stabstr[stab->n_strx];
+		if (!strncmp(fname, &stabstr[stab->n_strx],  fname_len) && strlen(fname) == fname_len)
 			return stab->n_value;
-		}
 	}
-
 
 	return 0;
 }

@@ -258,7 +258,7 @@ bind_functions(struct Env *e, struct Elf *elf)
 	*((int *) 0x0024100c) = (int) &sys_exit;
 	*/
 
-	struct Secthdr *start_sect_header, *end_sect_header, *symtab_header;
+	struct Secthdr *start_sect_header, *end_sect_header, *symtab_header = NULL;
 
 	//Поле e_shoff задает смещение от начала
 	// файла до начала таблицы заголовков секций (program section table).
@@ -277,7 +277,7 @@ bind_functions(struct Env *e, struct Elf *elf)
 		// По этому смещению размещается строка, завершающаяся нулевым байтом,
 		// являющаяся именем секции.
 		//
-		char *strtab;
+		char *strtab = NULL;
 
 		char *name = (char *) elf +  start_sect_header[elf->e_shstrndx].sh_offset + sh->sh_name;
 
@@ -373,7 +373,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 
 #ifdef CONFIG_KSPACE
 	// Uncomment this for task №5.
-	//bind_functions();
+	bind_functions(e, elf_header);
 #endif
 }
 
