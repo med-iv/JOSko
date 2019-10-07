@@ -13,6 +13,8 @@
 #include <kern/sched.h>
 #include <kern/cpu.h>
 
+#include <kern/kdebug.h>
+
 struct Env env_array[NENV];
 struct Env *curenv = NULL;
 struct Env *envs = env_array;		// All environments
@@ -121,7 +123,16 @@ env_init(void)
 {
 	// Set up envs array
 	//LAB 3: Your code here.
+	env_free_list = &(envs[0]);
 	
+	size_t i;
+	for (i = 0; i < NENV - 1; ++i) {
+		memset(&(envs[i]), 0, sizeof(*envs));
+		envs[i].env_link = &envs[i + 1];
+	}
+	memset(&(envs[i]), 0, sizeof(*envs));
+
+
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -199,8 +210,10 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_tf.tf_es = GD_KD | 0;
 	e->env_tf.tf_ss = GD_KD | 0;
 	e->env_tf.tf_cs = GD_KT | 0;
+
 	//LAB 3: Your code here.
-	// e->env_tf.tf_esp = 0x210000;
+	e->env_tf.tf_esp = 0x210000 + 2 * PGSIZE * (e - envs);
+
 #else
 #endif
 	// You will set e->env_tf.tf_eip later.
@@ -213,13 +226,28 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	return 0;
 }
 
+/*
+ .strtab This section holds strings, most commonly the strings
+ that represent the names associated
+  with symbol table entries. If the file has a loadable segment
+  that includes the symbol string
+ table, the section’s attributes will include the SHF_ALLOC bit;
+ otherwise, that bit will be off.
+.symtab This section holds a symbol table, as ‘‘Symbol Table’’
+in this section describes. If the file
+has a loadable segment that includes the symbol table,
+the section’s attributes will include
+the SHF_ALLOC bit; otherwise, that bit will be off.
+ */
+
+
 #ifdef CONFIG_KSPACE
 static void
 bind_functions(struct Env *e, struct Elf *elf)
 {
 	//find_function from kdebug.c should be used
 	//LAB 3: Your code here.
-
+	// https://ejudge.ru/study/3sem/elf.html
 	/*
 	*((int *) 0x00231008) = (int) &cprintf;
 	*((int *) 0x00221004) = (int) &sys_yield;
@@ -229,6 +257,52 @@ bind_functions(struct Env *e, struct Elf *elf)
 	*((int *) 0x00231010) = (int) &sys_exit;
 	*((int *) 0x0024100c) = (int) &sys_exit;
 	*/
+
+	struct Secthdr *start_sect_header, *end_sect_header, *symtab_header;
+
+	//Поле e_shoff задает смещение от начала
+	// файла до начала таблицы заголовков секций (program section table).
+	start_sect_header = (struct Secthdr *) ((uint8_t *) elf + elf->e_shoff);
+
+	// Поле e_shnum хранит количество записей в таблице заголовков секций.
+	end_sect_header = start_sect_header + elf->e_shnum;
+
+	for (struct Secthdr *sh = start_sect_header; sh < end_sect_header; ++sh) {
+		// Поле e_shstrndx хранит индекс заголовка секции,
+		// которая хранит имена всех секций
+		//
+		// Поле sh_name хранит индекс имени секции.
+		// Индекс имени - это смещение в данных секции,
+		// индекс которой задается в поле e_shstrndx заголовка ELF-файла.
+		// По этому смещению размещается строка, завершающаяся нулевым байтом,
+		// являющаяся именем секции.
+		//
+		char *strtab;
+
+		char *name = (char *) elf +  start_sect_header[elf->e_shstrndx].sh_offset + sh->sh_name;
+
+		if (sh->sh_type == ELF_SHT_SYMTAB && !strcmp(name, ".symtab")) {
+		    symtab_header = sh;
+		} else if (sh->sh_type == ELF_SHT_STRTAB && !strcmp(name, ".strtab")) {
+		    strtab = (char *) elf + sh->sh_offset;
+		}
+
+		struct Elf32_Sym *symtab = (struct Elf32_Sym *)((char *) elf + symtab_header->sh_offset);
+		struct Elf32_Sym *symtab_end = (struct Elf32_Sym *) ((char *) symtab + symtab_header->sh_size);
+
+
+		for (; symtab < symtab_end; ++symtab) {
+			if (ELF32_ST_BIND(symtab->st_info) == 1) {
+				uint32_t func_ptr;
+				if ((func_ptr = (uint32_t) find_function(strtab + symtab->st_name))) {
+					*((uint32_t *) symtab->st_value) = func_ptr;
+		        }
+			 }
+		}
+	}
+
+
+
 }
 #endif
 
@@ -276,6 +350,27 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 
 	//LAB 3: Your code here.
 	
+	struct Elf *elf_header = (struct Elf *) binary;
+
+	// is this a valid ELF?
+	if (elf_header->e_magic != ELF_MAGIC) {
+		panic("Not ELF");
+	}
+
+	struct Proghdr *ph, *eph;
+
+	ph = (struct Proghdr *) ((uint8_t *) elf_header + elf_header->e_phoff);
+	eph = ph + elf_header->e_phnum;
+
+	for (; ph < eph; ph++) {
+		if (ph->p_type == ELF_PROG_LOAD) {
+			memcpy((void *) ph->p_va, binary + ph->p_offset, ph->p_filesz);
+			memset((uint8_t *) ph->p_va + ph->p_filesz, 0, ph->p_memsz - ph->p_filesz);
+		}
+	}
+
+	e->env_tf.tf_eip = elf_header->e_entry;
+
 #ifdef CONFIG_KSPACE
 	// Uncomment this for task №5.
 	//bind_functions();
@@ -293,6 +388,17 @@ void
 env_create(uint8_t *binary, size_t size, enum EnvType type)
 {
 	//LAB 3: Your code here.
+	struct Env *env;
+	int r;
+
+	if ((r = env_alloc(&env, 0)) < 0) {
+		//panic("env_alloc");
+		panic("env_alloc: %i", r);
+	}
+
+	load_icode(env, binary, size);
+
+	env->env_type = type;
 }
 
 //
@@ -321,9 +427,12 @@ env_destroy(struct Env *e)
 	//LAB 3: Your code here.
 	env_free(e);
 
-	cprintf("Destroyed the only environment - nothing more to do!\n");
+	/*cprintf("Destroyed the only environment - nothing more to do!\n");
 	while (1)
-		monitor(NULL);
+		monitor(NULL); */
+	if (e == curenv) {
+		sched_yield();
+	}
 }
 
 #ifdef CONFIG_KSPACE
@@ -419,6 +528,16 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 	//
 	//LAB 3: Your code here.
+
+
+	if (curenv != e) {
+	     if (curenv && curenv->env_status == ENV_RUNNING) {
+	       curenv->env_status = ENV_RUNNABLE;
+	     }
+	     curenv = e;
+	     curenv->env_status = ENV_RUNNING;
+	     curenv->env_runs++;
+	   }
 
 
 	env_pop_tf(&e->env_tf);
