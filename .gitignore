@@ -2,6 +2,8 @@
 *.swp
 *~
 *.o
+.idea
+.vscode
 /lib/random_data.c
 .DS_Store
 /kern/payload.c
@@ -22,3 +24,6 @@
 /lab?-handin.tar.gz
 /lab?/
 /sol?/
+
+
+/CMakeLists.txt

@@ -1,5 +1,9 @@
 /* See COPYRIGHT for copyright information. */
 
+/* маскируемые — прерывания, которые можно запрещать установкой соответствующих битов
+в регистре маскирования прерываний (в x86-процессорах — сбросом флага IF в регистре флагов);
+*/
+
 #include <inc/mmu.h>
 #include <inc/memlayout.h>
 
@@ -41,6 +45,8 @@ _start = RELOC(entry)
 
 .globl entry
 entry:
+    cli // Clear interrupt flag; interrupts disabled when interrupt flag cleared.
+
 	movw	$0x1234,0x472			# warm boot
 
 	# We haven't set up virtual memory yet, so we're running from
@@ -109,6 +115,7 @@ _generall_syscall:
 .globl sys_yield
 .type  sys_yield, @function
 sys_yield:
+    cli
 	call _generall_syscall
 	call csys_yield
 	jmp .
@@ -121,6 +128,7 @@ sys_yield:
 .globl sys_exit
 .type  sys_exit, @function
 sys_exit:
+    cli
 	// в ebp 0, так как там ничего нет, в esp адрес указателя стека ядра
 	movl $0x0, %ebp
 	movl $(bootstacktop),%esp
