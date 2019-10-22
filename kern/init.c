@@ -43,6 +43,7 @@ i386_init(void)
 
     irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
 
+    monitor(NULL);
 #ifdef CONFIG_KSPACE
 	// Touch all you want.
 	ENV_CREATE_KERNEL_TYPE(prog_test1);
