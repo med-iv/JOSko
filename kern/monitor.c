@@ -30,10 +30,33 @@ static struct Command commands[] = {
     { "backtrace", "Display backtrace", mon_backtrace },
     { "timer_start", "timer_start", mon_timer_start },
     { "timer_stop", "timer_stop", mon_timer_stop },
+    { "pages", "Display pages", mon_pages}
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
 /***** Implementations of basic kernel monitor commands *****/
+int
+mon_pages()
+{
+    size_t i;
+    int is_prev_free;
+
+    is_prev_free = is_page_free(&pages[0]);
+    for (i = 1; i <= npages; i++) {
+        cprintf("%d", i);
+        if (i < npages && !(is_page_free(&pages[i]) ^ is_prev_free)) {
+            while (i < npages && !(is_page_free(&pages[i]) ^ is_prev_free)) {
+                i++;
+            }
+            cprintf("..%d", i);
+        }
+        cprintf(is_prev_free ? " FREE\n" : " ALLOCATED\n");
+        is_prev_free = ~is_prev_free;
+    }
+    return 0;
+}
+
+
 int
 mon_timer_start()
 {
