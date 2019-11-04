@@ -63,7 +63,7 @@ void	page_decref(struct PageInfo *pp);
 void	tlb_invalidate(pde_t *pgdir, void *va);
 
 static inline physaddr_t
-page2pa(struct PageInfo *pp)
+    page2pa(struct PageInfo *pp)
 {
 	return (pp - pages) << PGSHIFT;
 }
@@ -83,7 +83,7 @@ page2kva(struct PageInfo *pp)
 }
 
 static inline int
-dis_page_free(struct PageInfo *pp)
+is_page_free(struct PageInfo *pp)
 {
     return (pp->pp_link) ? -1 : 0;
 }
