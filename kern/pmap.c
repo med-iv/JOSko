@@ -120,7 +120,7 @@ boot_alloc(uint32_t n) {
 
 #ifdef SANITIZE_SHADOW_BASE
 	// Unpoison the result since it is now allocated.
-	// platform_asan_unpoison(result, n);
+	platform_asan_unpoison(result, n);
 #endif
 
 	return result;
@@ -256,7 +256,7 @@ page_alloc(int alloc_flags)
 
 #ifdef SANITIZE_SHADOW_BASE
 	// Unpoison allocated memory before accessing it!
-	// platform_asan_unpoison(page2kva(p), PGSIZE);
+	platform_asan_unpoison(page2kva(page), PGSIZE);
 #endif
 	return page;
 }
