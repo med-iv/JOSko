@@ -469,9 +469,10 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	
 	struct Elf *elf_header = (struct Elf *) binary;
 
-	// is this a valid ELF?
+	lcr3(PADDR(e->env_pgdir));
+	elf_header = (struct Elf *) binary;
 	if (elf_header->e_magic != ELF_MAGIC) {
-		panic("Not ELF");
+		panic("IT is not ELF file!");
 	}
 
 	struct Proghdr *ph, *eph;
