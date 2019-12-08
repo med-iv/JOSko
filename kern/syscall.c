@@ -125,6 +125,22 @@ sys_env_set_status(envid_t envid, int status)
     return 0;
 }
 
+// Set envid's trap frame to 'tf'.
+// tf is modified to make sure that user environments always run at code
+// protection level 3 (CPL 3) with interrupts enabled.
+//
+// Returns 0 on success, < 0 on error.  Errors are:
+//	-E_BAD_ENV if environment envid doesn't currently exist,
+//		or the caller doesn't have permission to change envid.
+static int
+sys_env_set_trapframe(envid_t envid, struct Trapframe *tf)
+{
+    // LAB 11: Your code here.
+    // Remember to check whether the user has supplied us with a good
+    // address!
+    panic("sys_env_set_trapframe not implemented");
+}
+
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
 // Env's 'env_pgfault_upcall' field.  When 'envid' causes a page fault, the
 // kernel will push a fault record onto the exception stack, then branch to
@@ -317,6 +333,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
         if ((err = sys_page_map(0, srcva, envid, target->env_ipc_dstva, perm, 0)) < 0) {
             return err;
         }
+    } else {
         perm = 0;
     }
     target->env_ipc_recving = 0;
@@ -346,10 +363,8 @@ sys_ipc_recv(void *dstva)
         return -E_INVAL;
     }
     curenv->env_ipc_dstva = (uintptr_t) dstva < UTOP ? dstva : 0;
-    curenv->env_ipc_recving = true;
+    curenv->env_ipc_recving = 1;
     curenv->env_status = ENV_NOT_RUNNABLE;
-    curenv->env_tf.tf_regs.reg_eax = 0;
-    sched_yield();
     return 0;
 }
 

@@ -129,7 +129,7 @@ env_init(void)
 	// Set up envs array
 	//LAB 3: Your code here.
 	env_free_list = &(envs[0]);
-	
+
 	size_t i;
 	for (i = 0; i < NENV - 1; ++i) {
 		memset(&(envs[i]), 0, sizeof(*envs));
@@ -472,7 +472,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	//LAB 3: Your code here.
-	
+
 	struct Elf *elf_header = (struct Elf *) binary;
 
 	lcr3(PADDR(e->env_pgdir));
@@ -538,6 +538,16 @@ env_create(uint8_t *binary, size_t size, enum EnvType type)
 	load_icode(env, binary, size);
 
 	env->env_type = type;
+
+    // If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
+    // LAB 10: Your code here.
+    if (type == ENV_TYPE_FS) {
+        // The eflags register will be saved automatically
+        // when JOS switches context, so nothing else needs
+        // to be done to ensure that the privilege level will
+        // be restored properly
+        env->env_tf.tf_eflags |= FL_IOPL_MASK;
+    }
 }
 
 //

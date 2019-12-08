@@ -24,7 +24,8 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 {
 	// LAB 9: Your code here.
     int err;
-    if ((err = sys_ipc_recv(pg ? pg : (void *) -1))) {
+
+    if ((err = sys_ipc_recv(pg ? pg : (void *) -1)) < 0) {
         if (from_env_store) *from_env_store = 0;
         if (perm_store) *perm_store = 0;
         return err;
@@ -41,7 +42,6 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 #ifdef SANITIZE_USER_SHADOW_BASE
 	// platform_asan_unpoison(pg, PGSIZE);
 #endif
-	return 0;
 }
 
 // Send 'val' (and 'pg' with 'perm', if 'pg' is nonnull) to 'toenv'.
@@ -56,7 +56,6 @@ void
 ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 {
 	// LAB 9: Your code here.
-    // LAB 9: Your code here.
     int err;
 
     do {
