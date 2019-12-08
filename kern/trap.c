@@ -106,7 +106,7 @@ trap_init(void)
 	SETGATE(idt[T_PGFLT], 0, GD_KT, (int) &pgflt_thdlr, 0);
 	SETGATE(idt[T_FPERR], 0, GD_KT, (int) &fperr_thdlr, 0);
 	SETGATE(idt[T_SYSCALL], 0, GD_KT, (int) &syscall_thdlr, 3);
-	// Per-CPU setup 
+	// Per-CPU setup
 	trap_init_percpu();
 }
 
@@ -340,6 +340,33 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 9: Your code here.
+
+    if (curenv->env_pgfault_upcall) {
+        uintptr_t stack_top = UXSTACKTOP;
+        struct UTrapframe *utf;
+        // Page fault happened while handling a page fault
+        if (tf->tf_esp >= UXSTACKTOP - PGSIZE && tf->tf_esp < UXSTACKTOP) {
+            // Push an extra word
+            stack_top = tf->tf_esp - sizeof(uintptr_t);
+        }
+        utf = (struct UTrapframe*) (stack_top - sizeof(struct UTrapframe));
+
+        // If the stack overflows, this assertion will fail
+        user_mem_assert(curenv, utf, sizeof(struct UTrapframe), PTE_W | PTE_U);
+        // Save the data for our trapframe
+        utf->utf_esp = tf->tf_esp;
+        utf->utf_eflags = tf->tf_eflags;
+        utf->utf_eip = tf->tf_eip;
+        utf->utf_regs = tf->tf_regs;
+        utf->utf_err = tf->tf_err;
+        utf->utf_fault_va = fault_va;
+
+        // Prepare to call env_pgfault_upcall
+        tf->tf_esp = (uintptr_t) utf;
+        tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;
+
+        env_run(curenv);
+    }
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
