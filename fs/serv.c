@@ -206,31 +206,21 @@ serve_set_size(envid_t envid, struct Fsreq_set_size *req)
 int
 serve_read(envid_t envid, union Fsipc *ipc)
 {
-	struct Fsreq_read *req = &ipc->read;
-	struct Fsret_read *ret = &ipc->readRet;
+    struct Fsreq_read *req = &ipc->read;
+    struct Fsret_read *ret = &ipc->readRet;
+    struct OpenFile *o;
+    int e;
+    ssize_t r;
 
-	if (debug) {
+    if (debug)
         cprintf("serve_read %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
-    }
 
-	// Lab 10: Your code here:
-    if (req->req_n > sizeof(ret->ret_buf)) {
-        return -E_INVAL;
-    }
-
-    struct OpenFile *of;
-    ssize_t err;
-
-    if ((err = openfile_lookup(envid, req->req_fileid, &of)) < 0) {
-        return err;
-    }
-
-    // Read req_n bytes.
-    // On success, file_read() returns the nubmer of bytes read.
-    if ((err = file_read(of->o_file, ret->ret_buf, req->req_n, of->o_fd->fd_offset)) > 0) {
-        of->o_fd->fd_offset += err;
-    }
-	return err;
+    // Lab 10: Your code here:
+    if ((e = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+        return e;
+    if ((r = file_read(o->o_file, ret->ret_buf, req->req_n, o->o_fd->fd_offset)) > 0)
+        o->o_fd->fd_offset += r;
+    return r;
 }
 
 
@@ -245,9 +235,6 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// LAB 10: Your code here.
-    if (req->req_n > sizeof(req->req_buf))
-        return -E_INVAL;
-
     struct OpenFile *of;
     ssize_t err;
 
