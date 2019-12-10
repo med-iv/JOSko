@@ -13,6 +13,7 @@
 #include <kern/kclock.h>
 #include <kern/picirq.h>
 #include <kern/cpu.h>
+#include <inc/vsyscall.h>
 
 #ifndef debug
 # define debug 0
@@ -230,6 +231,7 @@ trap_dispatch(struct Trapframe *tf)
         // LAB 4: your code here
         rtc_check_status();
         pic_send_eoi(IRQ_CLOCK);
+        vsys[VSYS_gettime] = gettime();
 		sched_yield();
 		return;
 	}

@@ -2,6 +2,39 @@
 
 #include <inc/x86.h>
 #include <kern/kclock.h>
+#include <inc/time.h>
+
+
+int gettimestamp(void)
+{
+    struct tm t;
+
+    t.tm_sec = BCD2BIN(mc146818_read(RTC_SEC));
+    t.tm_min = BCD2BIN(mc146818_read(RTC_MIN));
+    t.tm_hour = BCD2BIN(mc146818_read(RTC_HOUR));
+    t.tm_mday = BCD2BIN(mc146818_read(RTC_DAY));
+    t.tm_mon = BCD2BIN(mc146818_read(RTC_MON));
+    t.tm_year = BCD2BIN(mc146818_read(RTC_YEAR));
+
+    return timestamp(&t);
+}
+
+
+int gettime(void)
+{
+    int time;
+
+	nmi_disable();
+	// LAB 12: your code here
+    while (mc146818_read(RTC_AREG) & RTC_UPDATE_IN_PROGRESS){}
+
+    if ((time = gettimestamp()) != gettimestamp()) {
+        time = gettimestamp();
+    }
+    nmi_enable();
+
+    return time;
+}
 
 void
 rtc_init(void)
@@ -18,7 +51,7 @@ rtc_init(void)
 
     outb(IO_RTC_CMND, RTC_AREG);
     uint8_t A = inb(IO_RTC_DATA);
-    outb(IO_RTC_DATA, A | 0xF);
+    outb(IO_RTC_DATA, A | 0xE);
 
 	nmi_enable();
 }

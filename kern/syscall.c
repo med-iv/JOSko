@@ -11,6 +11,7 @@
 #include <kern/syscall.h>
 #include <kern/console.h>
 #include <kern/sched.h>
+#include <kern/kclock.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -394,6 +395,17 @@ sys_ipc_recv(void *dstva)
     return 0;
 }
 
+// Return date and time in UNIX timestamp format: seconds passed
+// from 1970-01-01 00:00:00 UTC.
+static int
+sys_gettime(void)
+{
+	// LAB 12: Your code here.
+
+	//panic("sys_gettime not implemented");
+	return gettime();
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -431,6 +443,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
             return sys_ipc_try_send((envid_t) a1, (uint32_t) a2, (void *) a3, (unsigned) a4);
         case SYS_ipc_recv:
             return sys_ipc_recv((void *) a1);
+        case SYS_gettime:
+            return sys_gettime();
         default:
             return -E_INVAL;
     }

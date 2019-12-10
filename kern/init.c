@@ -15,6 +15,8 @@
 #include <kern/picirq.h>
 #include <kern/kclock.h>
 
+#include <inc/vsyscall.h>
+
 void
 i386_init(void)
 {
@@ -53,7 +55,7 @@ i386_init(void)
 	// user environment initialization functions
 	env_init();
 	trap_init();
-
+    vsys[VSYS_gettime] = gettime();
 	clock_idt_init();
 
 	pic_init();
@@ -84,6 +86,8 @@ i386_init(void)
 
 	// Should not be necessary - drains keyboard because interrupt has given up.
 	kbd_intr();
+
+    vsys[VSYS_gettime] = gettime();
 
 	// Schedule and run the first user environment!
 	sched_yield();
