@@ -17,6 +17,10 @@
 
 #include <inc/vsyscall.h>
 
+
+int *vsys;
+
+
 void
 i386_init(void)
 {
@@ -60,6 +64,8 @@ i386_init(void)
 
 	pic_init();
 	rtc_init();
+
+    vsys[VSYS_gettime] = gettime();
 
     irq_setmask_8259A(irq_mask_8259A & ~(1 << IRQ_CLOCK));
 

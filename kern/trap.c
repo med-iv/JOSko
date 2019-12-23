@@ -19,6 +19,8 @@
 # define debug 0
 #endif
 
+int *vsys;
+
 static struct Taskstate ts;
 
 /* For debugging, so print_trapframe can distinguish between printing
@@ -239,11 +241,13 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle keyboard and serial interrupts.
 	// LAB 11: Your code here.
     if (tf->tf_trapno == IRQ_OFFSET + IRQ_KBD) {
+        pic_send_eoi(IRQ_KBD);
         kbd_intr();
         sched_yield();
         return;
     }
     if (tf->tf_trapno == IRQ_OFFSET + IRQ_SERIAL) {
+        pic_send_eoi(IRQ_SERIAL);
         serial_intr();
         sched_yield();
         return;

@@ -4,8 +4,8 @@
 #include <kern/kclock.h>
 #include <inc/time.h>
 
-
-int gettimestamp(void)
+static int
+gettimestamp(void)
 {
     struct tm t;
 
