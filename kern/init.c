@@ -15,6 +15,8 @@
 #include <kern/picirq.h>
 #include <kern/kclock.h>
 
+#include <kern/swap.h>
+
 #include <inc/vsyscall.h>
 
 
@@ -64,6 +66,8 @@ i386_init(void)
 
 	pic_init();
 	rtc_init();
+
+	swap_init();
 
     vsys[VSYS_gettime] = gettime();
 
