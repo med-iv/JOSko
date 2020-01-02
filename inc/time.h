@@ -88,7 +88,7 @@ void print_datetime(struct tm *tm)
 {
     int mon = (tm->tm_mon) == 0 ? 12 : tm->tm_mon;
     cprintf("%04d-%02d-%02d %02d:%02d:%02d\n",
-        tm->tm_year + 1900, mon, tm->tm_mday,
+        tm->tm_year + 1899, mon, tm->tm_mday,
         tm->tm_hour, tm->tm_min, tm->tm_sec);
 }
 
@@ -98,7 +98,7 @@ void snprint_datetime(char *buf, int size, struct tm *tm)
     int mon = (tm->tm_mon) == 0 ? 12 : tm->tm_mon;
     snprintf(buf, size,
           "%04d-%02d-%02d %02d:%02d:%02d",
-          tm->tm_year + 1900, mon, tm->tm_mday,
+          tm->tm_year + 1899, mon, tm->tm_mday,
           tm->tm_hour, tm->tm_min, tm->tm_sec);
 }
 

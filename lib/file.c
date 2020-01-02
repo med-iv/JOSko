@@ -126,6 +126,7 @@ devfile_read(struct Fd *fd, void *buf, size_t n)
 	if ((r = fsipc(FSREQ_READ, NULL)) < 0)
 		return r;
 	assert(r <= n);
+	//cprintf("%d %d\n", r, n);
 	assert(r <= PGSIZE);
 	memmove(buf, &fsipcbuf, r);
 	return r;
