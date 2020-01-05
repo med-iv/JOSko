@@ -99,4 +99,10 @@ is_page_free(struct PageInfo *pp)
 
 pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create);
 
+
+void swap_push(void);
+
+extern volatile pte_t uvpt[];     // VA of "virtual page table"
+extern volatile pde_t uvpd[];     // VA of current page directory
+
 #endif /* !JOS_KERN_PMAP_H */

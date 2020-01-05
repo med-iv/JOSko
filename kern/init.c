@@ -67,7 +67,7 @@ i386_init(void)
 	pic_init();
 	rtc_init();
 
-	swap_init();
+	//swap_init();
 
     vsys[VSYS_gettime] = gettime();
 

@@ -323,6 +323,8 @@ page_fault_handler(struct Trapframe *tf)
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
 
+
+
 	// Handle kernel-mode page faults.
 
 	// LAB 8: Your code here.

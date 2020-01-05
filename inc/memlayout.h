@@ -4,7 +4,11 @@
 #ifndef __ASSEMBLER__
 #include <inc/types.h>
 #include <inc/mmu.h>
+
+
 #endif /* not __ASSEMBLER__ */
+
+
 
 /*
  * This file contains definitions for memory management in our OS,
@@ -96,6 +100,7 @@
 // Amount of memory mapped by entrypgdir.
 #define BOOTMEMSIZE (12*1024*1024)
 
+
 // Kernel stack.
 #define KSTACKTOP	KERNBASE
 #define KSTKSIZE	(8*PGSIZE)   		// size of a kernel stack
@@ -105,7 +110,20 @@
 #define MMIOLIM		(KSTACKTOP - PTSIZE)
 #define MMIOBASE	(MMIOLIM - PTSIZE)
 
-#define ULIM		(MMIOBASE)
+#define SWAP_AMOUNT  2
+
+#define SWAP_SIZE   PGSIZE * SWAP_AMOUNT
+#define SWAP_ZONE   (MMIOBASE) - SWAP_SIZE
+
+#define LRU_SIZE    SWAP_AMOUNT * sizeof(*lru_list) // 16
+#define LRU_ZONE    SWAP_ZONE - LRU_SIZE
+
+#define LZ4_COMPRESSBOUND(isize)  ((unsigned)(isize) > (unsigned)LZ4_MAX_INPUT_SIZE ? 0 : (isize) + ((isize)/255) + 16)
+#define COMP_SIZE   LZ4_COMPRESSBOUND(PGSIZE) //4128
+#define COMP_ZONE   LRU_ZONE - COMP_SIZE
+
+
+#define ULIM		(MMIOBASE - PTSIZE)
 
 /*
  * User read-only mappings! Anything below here til UTOP are readonly to user.
@@ -199,6 +217,10 @@ struct PageInfo {
 	// Next page on the free list.
 	struct PageInfo *pp_link;
 
+    struct PageInfo *lru_prev;
+    struct PageInfo *lru_next;
+
+
 	// pp_ref is the count of pointers (usually in page table entries)
 	// to this page, for pages allocated using page_alloc.
 	// Pages allocated at boot time using pmap.c's
@@ -206,6 +228,8 @@ struct PageInfo {
 
 	uint16_t pp_ref;
 };
+
+
 
 #endif /* !__ASSEMBLER__ */
 #endif /* !JOS_INC_MEMLAYOUT_H */

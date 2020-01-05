@@ -12,6 +12,12 @@
 #include <kern/kclock.h>
 #include <kern/env.h>
 
+#include <kern/swap.h>
+#include <kern/lz4.h>
+
+#include <inc/memlayout.h>
+
+
 #ifdef SANITIZE_SHADOW_BASE
 // asan unpoison routine used for whitelisting regions.
 void platform_asan_unpoison(void *addr, uint32_t size);
@@ -29,6 +35,8 @@ pde_t *kern_pgdir;		// Kernel's initial page directory
 struct PageInfo *pages;		// Physical page state array
 static struct PageInfo *page_free_list;	// Free list of physical pages
 struct PageInfo *page_free_list_end;
+
+static int is_swap_full = 0;
 
 // --------------------------------------------------------------
 // Detect machine's physical memory setup.
@@ -184,6 +192,17 @@ mem_init(void)
 	vsys = boot_alloc(NVSYSCALLS * sizeof(*vsys));
 	memset(vsys, 0, NVSYSCALLS * sizeof(*vsys));
 
+	// SWAP
+    SwapBuffer = (char *) boot_alloc(SWAP_SIZE);
+    memset(SwapBuffer, 0, SWAP_SIZE);
+
+	lru_list = boot_alloc(LRU_SIZE);
+    memset(lru_list, 0, LRU_SIZE);
+
+    CompressionBuffer = boot_alloc(COMP_SIZE);
+    memset(CompressionBuffer, 0, COMP_SIZE);
+
+
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
 	// up the list of free physical pages. Once we've done so, all further
@@ -195,6 +214,12 @@ mem_init(void)
 	check_page_free_list(1);
 	check_page_alloc();
 	check_page();
+
+    boot_map_region(kern_pgdir, SWAP_ZONE, SWAP_SIZE, PADDR(SwapBuffer), PTE_W | PTE_P);
+
+    boot_map_region(kern_pgdir, LRU_ZONE, LRU_SIZE , PADDR(lru_list), PTE_W | PTE_P);
+
+    boot_map_region(kern_pgdir, COMP_ZONE, COMP_SIZE , PADDR(CompressionBuffer), PTE_W | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -339,24 +364,69 @@ struct PageInfo *
 page_alloc(int alloc_flags)
 {
 	// Fill this function in
+    if (!page_free_list) {
+        if (!is_swap_full) {
+            is_swap_full = 1;
+            swap_push(); // освобождаем память
+        } else {
+            return NULL;
+        }
+    }
+
 	struct PageInfo *page;
 
 	page = page_free_list;
-	if (!page_free_list) return NULL;
+
 	page_free_list = page_free_list->pp_link;
 	if (!page_free_list) {
 		page_free_list_end = NULL;
 	}
 
 	page->pp_link = NULL;
-	if (alloc_flags & ALLOC_ZERO) memset(page2kva(page), 0, PGSIZE);
+	if (alloc_flags & ALLOC_ZERO) {
+        memset(page2kva(page), 0, PGSIZE);
+    }
 
 
 #ifdef SANITIZE_SHADOW_BASE
 	// Unpoison allocated memory before accessing it!
-	// platform_asan_unpoison(page2kva(p), PGSIZE);
+	platform_asan_unpoison(page2kva(p), PGSIZE);
 #endif
 	return page;
+}
+
+int sizes_swap[SWAP_AMOUNT];
+
+void
+swap_push(void)
+{
+    //*ptep = page2pa(pp) | perm | PTE_P;
+    SwapShift = SwapBuffer;
+    struct PageInfo *tail = lru_list->tail;
+    for (int k = 0; k < SWAP_AMOUNT; k++) {
+        int cur_size = LZ4_compress_default((char *)page2pa(tail), CompressionBuffer, PGSIZE, COMP_SIZE);
+        memcpy(SwapShift, CompressionBuffer, cur_size);
+        int id = SwapShift - SwapBuffer;
+        for (int i = 0; i < PGSIZE / sizeof(pde_t); i++) {
+            if (!(uvpd[i] & PTE_P)) {
+                continue;
+            }
+            size_t pn;
+            for (int j = 0; j < PGSIZE / sizeof(pte_t); j++) {
+                pn = PGNUM(PGADDR(i, j, 0));
+                if (pn < PGNUM(UTOP) && pn != PGNUM(UXSTACKTOP - PGSIZE) && uvpt[pn] & PTE_P) {
+                    if (PTE_ADDR(uvpt[pn]) == page2pa(tail)) {
+                        uvpt[pn] = (id << 12) | (uvpt[pn] & 0xFFF);
+                        uvpt[pn] &= ~PTE_P;
+                        uvpt[pn] |= PTE_G;
+                        page_decref(tail);
+                    }
+                }
+            }
+        }
+        sizes_swap[k] = cur_size;
+        SwapShift += cur_size;
+    }
 }
 
 //
@@ -369,13 +439,15 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
-	if (pp->pp_ref || pp->pp_link)
-		panic("page_free");
+	if (pp->pp_ref || pp->pp_link) {
+        panic("page_free");
+    }
 	pp->pp_link = page_free_list;
 	page_free_list = pp;
 	if (!page_free_list_end) {
 		page_free_list_end = pp;
 	}
+    delete_from_lru_list(pp);
 }
 
 //
@@ -420,11 +492,13 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	if (pgdir[PDX(va)] & PTE_P) {
 		return (pte_t*) KADDR(PTE_ADDR(pgdir[PDX(va)])) + PTX(va);
 	}
-	if (create == false)
-		return NULL;
+	if (create == false) {
+        return NULL;
+    }
 	new_page = page_alloc(ALLOC_ZERO);
-	if (!new_page)
-		return NULL;
+	if (!new_page) {
+        return NULL;
+    }
 	new_page->pp_ref++;
 	pgdir[PDX(va)] = page2pa(new_page) | PTE_SYSCALL;
 	return (pte_t*) page2kva(new_page) + PTX(va);
@@ -481,11 +555,20 @@ int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in
+	int is_new_page;
 	pte_t *ptep;
 
 	ptep = pgdir_walk(pgdir, va, 1);
 	if (!ptep)
 		return -E_NO_MEM;
+    is_new_page = pp->pp_ref ? 0 : 1;
+
+    if (is_new_page) {
+        add_to_lru_list(pp);
+    } else {
+        delete_from_lru_list(pp);
+        add_to_lru_list(pp);
+    }
 	pp->pp_ref++;
 	page_remove(pgdir, va);
 	*ptep = page2pa(pp) | perm | PTE_P;
@@ -812,7 +895,7 @@ check_kern_pgdir(void)
 	uint32_t i, n;
 	pde_t *pgdir;
 
-	pgdir = kern_pgdir;
+        pgdir = kern_pgdir;
 
 	// check pages array
 	n = ROUNDUP(npages*sizeof(struct PageInfo), PGSIZE);
@@ -838,6 +921,9 @@ check_kern_pgdir(void)
 		switch (i) {
 		case PDX(UVPT):
 		case PDX(KSTACKTOP-1):
+		case PDX(SWAP_ZONE):
+		//case PDX(LRU_ZONE):
+		//case PDX(COMP_ZONE):
 		case PDX(UPAGES):
 		case PDX(UENVS):
 		case PDX(UVSYS):
