@@ -17,7 +17,6 @@
 
 #include <inc/memlayout.h>
 
-
 #ifdef SANITIZE_SHADOW_BASE
 // asan unpoison routine used for whitelisting regions.
 void platform_asan_unpoison(void *addr, uint32_t size);
@@ -193,14 +192,14 @@ mem_init(void)
 	memset(vsys, 0, NVSYSCALLS * sizeof(*vsys));
 
 	// SWAP
-    SwapBuffer = (char *) boot_alloc(SWAP_SIZE);
-    memset(SwapBuffer, 0, SWAP_SIZE);
+    //SwapBuffer = (char *) boot_alloc(SWAP_SIZE);
+    //memset(SwapBuffer, 0, SWAP_SIZE);
 
-	lru_list = boot_alloc(LRU_SIZE);
-    memset(lru_list, 0, LRU_SIZE);
+	//lru_list = boot_alloc(LRU_SIZE);
+    //memset(lru_list, 0, LRU_SIZE);
 
-    CompressionBuffer = boot_alloc(COMP_SIZE);
-    memset(CompressionBuffer, 0, COMP_SIZE);
+    //CompressionBuffer = boot_alloc(COMP_SIZE);
+    //memset(CompressionBuffer, 0, COMP_SIZE);
 
 
 	//////////////////////////////////////////////////////////////////////
@@ -215,11 +214,11 @@ mem_init(void)
 	check_page_alloc();
 	check_page();
 
-    boot_map_region(kern_pgdir, SWAP_ZONE, SWAP_SIZE, PADDR(SwapBuffer), PTE_W | PTE_P);
+    //boot_map_region(kern_pgdir, SWAP_ZONE, SWAP_SIZE, PADDR(SwapBuffer), PTE_W | PTE_P);
 
-    boot_map_region(kern_pgdir, LRU_ZONE, LRU_SIZE , PADDR(lru_list), PTE_W | PTE_P);
+    //boot_map_region(kern_pgdir, LRU_ZONE, LRU_SIZE , PADDR(lru_list), PTE_W | PTE_P);
 
-    boot_map_region(kern_pgdir, COMP_ZONE, COMP_SIZE , PADDR(CompressionBuffer), PTE_W | PTE_P);
+    //boot_map_region(kern_pgdir, COMP_ZONE, COMP_SIZE , PADDR(CompressionBuffer), PTE_W | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -367,7 +366,7 @@ page_alloc(int alloc_flags)
     if (!page_free_list) {
         if (!is_swap_full) {
             is_swap_full = 1;
-            swap_push(); // освобождаем память
+            //swap_push(); // освобождаем память
         } else {
             return NULL;
         }
@@ -395,10 +394,9 @@ page_alloc(int alloc_flags)
 	return page;
 }
 
-int sizes_swap[SWAP_AMOUNT];
+static int sizes_swap[SWAP_AMOUNT];
 
-void
-swap_push(void)
+void swap_push()
 {
     //*ptep = page2pa(pp) | perm | PTE_P;
     SwapShift = SwapBuffer;
@@ -407,18 +405,17 @@ swap_push(void)
         int cur_size = LZ4_compress_default((char *)page2pa(tail), CompressionBuffer, PGSIZE, COMP_SIZE);
         memcpy(SwapShift, CompressionBuffer, cur_size);
         int id = SwapShift - SwapBuffer;
-        for (int i = 0; i < PGSIZE / sizeof(pde_t); i++) {
-            if (!(uvpd[i] & PTE_P)) {
-                continue;
-            }
-            size_t pn;
-            for (int j = 0; j < PGSIZE / sizeof(pte_t); j++) {
-                pn = PGNUM(PGADDR(i, j, 0));
-                if (pn < PGNUM(UTOP) && pn != PGNUM(UXSTACKTOP - PGSIZE) && uvpt[pn] & PTE_P) {
-                    if (PTE_ADDR(uvpt[pn]) == page2pa(tail)) {
-                        uvpt[pn] = (id << 12) | (uvpt[pn] & 0xFFF);
-                        uvpt[pn] &= ~PTE_P;
-                        uvpt[pn] |= PTE_G;
+        for(int j = 0; j < NENV; j++) {
+            if (envs[j].env_status == ENV_RUNNABLE || envs[j].env_status == ENV_RUNNING) {
+                pde_t *pgdir = envs[j].env_pgdir;
+                for (int i = 0; i < NPTENTRIES * PGSIZE; i += PGSIZE) {
+                    pte_t *tmp = pgdir_walk(pgdir, (void *) (0 + i), 0);
+                    if (tmp == NULL) {
+                        continue;
+                    } else if (PTE_ADDR(*tmp) == page2pa(tail)) {
+                        *tmp = (id << 12) | (*tmp & 0xFFF);
+                        *tmp &= ~PTE_P;
+                        *tmp |= PTE_G;
                         page_decref(tail);
                     }
                 }
@@ -447,7 +444,7 @@ page_free(struct PageInfo *pp)
 	if (!page_free_list_end) {
 		page_free_list_end = pp;
 	}
-    delete_from_lru_list(pp);
+    //delete_from_lru_list(pp);
 }
 
 //
@@ -564,10 +561,10 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
     is_new_page = pp->pp_ref ? 0 : 1;
 
     if (is_new_page) {
-        add_to_lru_list(pp);
+       // add_to_lru_list(pp);
     } else {
-        delete_from_lru_list(pp);
-        add_to_lru_list(pp);
+        //delete_from_lru_list(pp);
+        //add_to_lru_list(pp);
     }
 	pp->pp_ref++;
 	page_remove(pgdir, va);

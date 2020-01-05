@@ -12,7 +12,7 @@ char *SwapBuffer;
 
 char *SwapShift;
 
-char *CompressionBuffer;
+char CompressionBuffer[4128];
 
 struct lru_list1 {
     struct PageInfo *head;

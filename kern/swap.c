@@ -10,7 +10,7 @@
 void swap_init()
 {
 #ifdef Test
-   /*
+
     char src[] = "Ветер в поле закружил\n"
                     "Ветер в поле закружил\n"
                     "Ветер в поле закружил\n"
@@ -32,15 +32,15 @@ void swap_init()
                     "\n"
                     "     Лоботомия\n"
                     "\n";;
-*/
-    //char dst[LZ4_compressBound(321)];
-    //cprintf("%d\n", LZ4_compressBound(4096));
-    //int cur_size = LZ4_compress_default(src, dst, 321, LZ4_compressBound(321));
-    //cprintf("%d\n", LZ4_compressBound(cur_size));
-    //cprintf("%s\n", dst);
-    //char final[321];
-    //LZ4_decompress_safe(dst, final, cur_size, 321);
-    //cprintf("%s\n", final);
+
+    char dst[LZ4_compressBound(321)];
+    cprintf("%d\n", LZ4_compressBound(4096));
+    int cur_size = LZ4_compress_default(src, dst, 321, LZ4_compressBound(321));
+    cprintf("%d\n", LZ4_compressBound(cur_size));
+    cprintf("%s\n", dst);
+    char final[321];
+    LZ4_decompress_safe(dst, final, cur_size, 321);
+    cprintf("%s\n", final);
 #endif
 
 }
