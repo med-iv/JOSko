@@ -5,7 +5,7 @@
 #include <inc/lib.h>
 
 
-#define Test 0
+#define Test 1
 
 void swap_init()
 {
@@ -45,12 +45,25 @@ void swap_init()
 
 }
 
+void swap_shift(int k)
+{
+    char * tmp = swap_info[k].buffer;
+    for (int i = k; i < SWAP_AMOUNT - 1; i++) {
+        memmove(tmp, swap_info[i + 1].buffer, swap_info[i + 1].size);
+        tmp += swap_info[i + 1].size;
+        swap_info[i + 1].buffer = tmp;
+        swap_info[i].size = swap_info[i + 1].size;
+    }
+}
+
 
 void add_to_lru_list(struct PageInfo *pg)
 {
-    pg->lru_prev = lru_list->tail;
+    if (lru_list->size) {
+        pg->lru_next = lru_list->head;
+    }
 
-    if (lru_list->tail) {
+    if (lru_list->) {
         (lru_list->tail)->lru_next = pg;
     }
     if (lru_list->size == 0) {

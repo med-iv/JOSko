@@ -100,7 +100,8 @@ is_page_free(struct PageInfo *pp)
 pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create);
 
 
-void swap_push(void);
+void swap_workout(void);
+void swap_push (struct PageInfo *tail);
 
 
 #endif /* !JOS_KERN_PMAP_H */

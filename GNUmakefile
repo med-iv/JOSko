@@ -37,7 +37,7 @@ OBJCOPY       := llvm/gnu-objcopy
 OBJDUMP       := llvm-objdump
 NM            := llvm-nm
 
-CFLAGS        += -target i386-gnu-linux -march=pentium2 -pipe -DJOS_LLVM=1
+CFLAGS        += -target i386-gnu-linux -march=pentium2 -pipe -DJOS_LLVM=1 -g
 EXTRA_CFLAGS  += -Wno-self-assign -Wno-format-nonliteral -Wno-address-of-packed-member
 
 GCC_LIB       := $(shell $(CC) $(CFLAGS) -print-resource-dir)/lib/j*s/libclang_rt.builtins-i386.a

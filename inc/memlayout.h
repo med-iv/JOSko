@@ -110,12 +110,12 @@
 #define MMIOLIM		(KSTACKTOP - PTSIZE)
 #define MMIOBASE	(MMIOLIM - PTSIZE)
 
-#define SWAP_AMOUNT 2
+#define SWAP_AMOUNT 16
 
-#define SWAP_SIZE   PGSIZE * SWAP_AMOUNT
+#define SWAP_SIZE   (PGSIZE + sizeof(swap_info)) * SWAP_AMOUNT // 16 бит
 #define SWAP_ZONE   (MMIOBASE) - SWAP_SIZE
 
-#define LRU_SIZE    SWAP_AMOUNT * sizeof(*lru_list) // 16
+#define LRU_SIZE    SWAP_AMOUNT * sizeof(*lru_list)
 #define LRU_ZONE    SWAP_ZONE - LRU_SIZE
 
 #define LZ4_COMPRESSBOUND(isize)  ((unsigned)(isize) > (unsigned)LZ4_MAX_INPUT_SIZE ? 0 : (isize) + ((isize)/255) + 16)

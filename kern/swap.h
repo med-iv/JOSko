@@ -12,18 +12,26 @@ char *SwapBuffer;
 
 char *SwapShift;
 
-char CompressionBuffer[4128];
+char CompressionBuffer[COMP_SIZE];
 
 struct lru_list1 {
     struct PageInfo *head;
     struct PageInfo *tail;
-    char *buffer;
     int size;
 };
 
 struct lru_list1 *lru_list;
 
+struct swap {
+    char *buffer;
+    int size;
+};
+
+struct swap swap_info[SWAP_AMOUNT];
+
 void swap_init();
+
+void swap_shift(int k);
 
 void add_to_lru_list(struct PageInfo *pg);
 void delete_from_lru_list(struct PageInfo *pg);

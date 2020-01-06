@@ -15,6 +15,10 @@
 #include <kern/cpu.h>
 #include <inc/vsyscall.h>
 
+#include <kern/swap.h>
+#include <kern/pmap.h>
+#include <kern/lz4.h>
+
 #ifndef debug
 # define debug 0
 #endif
@@ -323,6 +327,25 @@ page_fault_handler(struct Trapframe *tf)
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
 
+	if (fault_va & PTE_G) {
+	    cprintf("FAULT HANDLINGn\n");
+        pte_t *ptep = pgdir_walk(curenv->env_pgdir, (void *) fault_va, 0);
+
+        int k = (*ptep & 0xF000) >> 12;
+        int cur_size = swap_info[k].size;
+        int flags = *ptep & 0xFFF;
+
+        LZ4_decompress_safe(swap_info[k].buffer, CompressionBuffer, cur_size, 4128);
+        swap_shift(k);
+        struct PageInfo *tail = lru_list->tail;
+        swap_push(tail);
+        struct PageInfo *pg = page_alloc(0);
+        if (page_insert(curenv->env_pgdir, pg, (void *) fault_va, flags) < 0) {
+            panic("At the disco");
+        }
+        curenv->swap_pages--;
+	    env_run(curenv);
+	}
 
 
 	// Handle kernel-mode page faults.
