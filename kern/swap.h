@@ -6,6 +6,7 @@
 //#include <kern/env.h>
 #include <kern/lz4.h>
 
+
 //uint32_t swap_bitmap[];
 
 char *SwapBuffer;

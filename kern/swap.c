@@ -48,48 +48,52 @@ void swap_init()
 void swap_shift(int k)
 {
     char * tmp = swap_info[k].buffer;
+    cprintf("%d\n", (int) tmp);
     for (int i = k; i < SWAP_AMOUNT - 1; i++) {
         memmove(tmp, swap_info[i + 1].buffer, swap_info[i + 1].size);
         tmp += swap_info[i + 1].size;
         swap_info[i + 1].buffer = tmp;
         swap_info[i].size = swap_info[i + 1].size;
+        cprintf("%d\n", (int) tmp);
     }
+
 }
 
 
 void add_to_lru_list(struct PageInfo *pg)
 {
+    if (pg == NULL) {
+        panic("page NULL");
+    }
+
+    if (lru_list->size == 0) {
+        lru_list->tail = pg;
+        pg->lru_next = NULL;
+    }
+
     if (lru_list->size) {
         pg->lru_next = lru_list->head;
+        (lru_list->head)->lru_prev = pg;
     }
 
-    if (lru_list->) {
-        (lru_list->tail)->lru_next = pg;
-    }
-    if (lru_list->size == 0) {
-        lru_list->head = pg;
-    }
-
-    lru_list->tail = pg;
+    lru_list->head = pg;
+    pg->lru_prev = NULL;
     lru_list->size += 1;
 }
 
+
 void delete_from_lru_list(struct PageInfo *pg)
 {
-    if (pg->lru_prev != NULL) {
-        pg->lru_prev->lru_next = pg->lru_next;
-    }
-    else {
-        lru_list->head = pg->lru_next;
-    }
-
-    if (pg->lru_next != NULL) {
-        pg->lru_next->lru_prev = pg->lru_prev;
-    }
-    else {
+    //cprintf("TAIL DELETE %0x\n", (int) pg);
+    if (lru_list->size == 1) {
+        lru_list->tail = NULL;
+        lru_list->head = NULL;
+    } else {
+        if (pg->lru_prev != NULL) {
+            (pg->lru_prev)->lru_next = NULL;
+        }
         lru_list->tail = pg->lru_prev;
     }
-
     lru_list->size -= 1;
 
     pg->lru_next = pg->lru_prev = NULL;

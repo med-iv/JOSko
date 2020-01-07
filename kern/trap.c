@@ -326,23 +326,29 @@ page_fault_handler(struct Trapframe *tf)
 
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
+    //cprintf("FAULT VA %u\n", fault_va);
 
-	if (fault_va & PTE_G) {
-	    cprintf("FAULT HANDLINGn\n");
+	if (fault_va & PTE_W) {
+	    //cprintf("FAULT HANDLING_PTEG\n");
         pte_t *ptep = pgdir_walk(curenv->env_pgdir, (void *) fault_va, 0);
 
         int k = (*ptep & 0xF000) >> 12;
         int cur_size = swap_info[k].size;
         int flags = *ptep & 0xFFF;
+        flags |= PTE_P;
+        flags &= ~PTE_W;
 
-        LZ4_decompress_safe(swap_info[k].buffer, CompressionBuffer, cur_size, 4128);
+        LZ4_decompress_safe(swap_info[k].buffer, CompressionBuffer, cur_size, PGSIZE);
         swap_shift(k);
         struct PageInfo *tail = lru_list->tail;
+        //cprintf("HANDLING TAIL %0x\n", (int)tail);
         swap_push(tail);
         struct PageInfo *pg = page_alloc(0);
         if (page_insert(curenv->env_pgdir, pg, (void *) fault_va, flags) < 0) {
-            panic("At the disco");
+            panic("At the disco\n");
         }
+        memcpy((char *)page2pa(pg), CompressionBuffer, PGSIZE);
+        add_to_lru_list(pg);
         curenv->swap_pages--;
 	    env_run(curenv);
 	}

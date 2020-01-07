@@ -35,7 +35,6 @@ struct PageInfo *pages;		// Physical page state array
 static struct PageInfo *page_free_list;	// Free list of physical pages
 struct PageInfo *page_free_list_end;
 
-static int is_swap_full = 0;
 
 // --------------------------------------------------------------
 // Detect machine's physical memory setup.
@@ -152,6 +151,7 @@ void
 mem_init(void)
 {
 	// Find out how much memory the machine has (npages & npages_basemem).
+	is_swap_full = 0;
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
@@ -370,7 +370,6 @@ page_alloc(int alloc_flags)
         if (!is_swap_full) {
             is_swap_full = 1;
             swap_workout(); // освобождаем память
-            return NULL;
         } else {
             return NULL;
         }
@@ -380,10 +379,11 @@ page_alloc(int alloc_flags)
 
 	page = page_free_list;
 
-	page_free_list = page_free_list->pp_link;
+    page_free_list = page_free_list->pp_link;
 	if (!page_free_list) {
 		page_free_list_end = NULL;
 	}
+
 
 	page->pp_link = NULL;
 	if (alloc_flags & ALLOC_ZERO) {
@@ -391,11 +391,15 @@ page_alloc(int alloc_flags)
     }
 
 
+
+
 #ifdef SANITIZE_SHADOW_BASE
 	// Unpoison allocated memory before accessing it!
 	platform_asan_unpoison(page2kva(page), PGSIZE);
 #endif
-    add_to_lru_list(page);
+	if (page != NULL) {
+        add_to_lru_list(page);
+    }
 	return page;
 }
 
@@ -411,59 +415,64 @@ void swap_workout()
 {
     cprintf("WORKOUT\n");
     SwapShift = SwapBuffer;
-    //cprintf("%u\n", (char *)page2pa(tail));
-    struct PageInfo *tail =
+    struct PageInfo *tail;
     for (int k = 0; k < SWAP_AMOUNT; k++) {
         tail = lru_list->tail;
-        cprintf("%0x\n", page2pa(tail));
+        cprintf("DEBUG %d\n", lru_list->size);
+        cprintf("TAIL %0x\n", (int) tail);
         int cur_size = LZ4_compress_default((char *)page2kva(tail), CompressionBuffer, PGSIZE, COMP_SIZE);
         memcpy(SwapShift, CompressionBuffer, cur_size);
         //int id = SwapShift - SwapBuffer;
         swap_info[k].buffer = SwapShift;
+        cprintf("buffer %0x\n", (int) swap_info[k].buffer);
         swap_info[k].size = cur_size;
         for(int j = 0; j < NENV; j++) {
             if (envs[j].env_status == ENV_RUNNABLE || envs[j].env_status == ENV_RUNNING) {
                 //cprintf("ЦИКЛ\n");
                 pde_t *pgdir = envs[j].env_pgdir;
                 for (int i = 0; i < NPTENTRIES * PGSIZE; i += PGSIZE) {
-                    pte_t *tmp = pgdir_walk(pgdir, (void *) (0 + i), 0);
+                    pte_t *tmp = pgdir_walk(pgdir, PGADDR(i, j, 0), 0);
                     if (tmp == NULL) {
                         continue;
                     } else if (PTE_ADDR(*tmp) == page2pa(tail)) {
                         envs[j].swap_pages++;
-                        //cprintf("ЗДАРОВА\n");
                         *tmp = (k << 12) | (*tmp & 0xFFF);
                         *tmp &= ~PTE_P;
-                        *tmp |= PTE_G;
+                        *tmp |= PTE_W;
                         page_decref(tail);
                     }
                 }
             }
         }
         for (int i = 0; i < NPTENTRIES * PGSIZE; i += PGSIZE) {
-            pte_t *tmp = pgdir_walk(kern_pgdir, (void *) (0 + i), 0);
+            //cprintf("ЦИКЛ\n");
+            pte_t *tmp = pgdir_walk(kern_pgdir, page2kva(tail), 0);
             if (tmp == NULL) {
                 continue;
-            } else if (PTE_ADDR(*tmp) == page2pa(tail)) {
-                cprintf("ЗДАРОВА\n");
+            } else {
+                //cprintf("GG");
+            }
+            if (PTE_ADDR(*tmp) == page2pa(tail)) {
+                cprintf("PTE_ADDR(*tmp) %0x\n", PTE_ADDR(*tmp));
                 *tmp = (k << 12) | (*tmp & 0xFFF);
                 *tmp &= ~PTE_P;
-                *tmp |= PTE_G;
+                *tmp |= PTE_W;
                 page_decref(tail);
+                cprintf("*tmp %0x\n", *tmp);
             }
         }
         SwapShift += cur_size;
-        delete_from_lru_list(tail);
-        add_to_lru_list(tail);
+        //cprintf("WORKOUT REFD %d\n", tail->pp_ref);
     }
 }
 
 void swap_push (struct PageInfo *tail)
 {
     int k = SWAP_AMOUNT - 1;
-    swap_info[SWAP_AMOUNT - 1].buffer = swap_info[SWAP_AMOUNT - 2].buffer + swap_info[SWAP_AMOUNT - 2].size;
-
+    //swap_info[SWAP_AMOUNT - 1].buffer = swap_info[SWAP_AMOUNT - 2].buffer + swap_info[SWAP_AMOUNT - 2].size;
     int cur_size = LZ4_compress_default((char *)page2kva(tail), CompressionBuffer, PGSIZE, COMP_SIZE);
+    cprintf("HERE\n");
+    cprintf("%d\n", (int) swap_info[SWAP_AMOUNT - 1].buffer);
     memcpy(swap_info[SWAP_AMOUNT - 1].buffer, CompressionBuffer, cur_size);
     swap_info[SWAP_AMOUNT - 1].size = cur_size;
     for(int j = 0; j < NENV; j++) {
@@ -471,7 +480,7 @@ void swap_push (struct PageInfo *tail)
             //cprintf("ЦИКЛ\n");
             pde_t *pgdir = envs[j].env_pgdir;
             for (int i = 0; i < NPTENTRIES * PGSIZE; i += PGSIZE) {
-                pte_t *tmp = pgdir_walk(pgdir, (void *) (0 + i), 0);
+                pte_t *tmp = pgdir_walk(pgdir, PGADDR(i, j, 0), 0);
                 if (tmp == NULL) {
                     continue;
                 } else if (PTE_ADDR(*tmp) == page2pa(tail)) {
@@ -479,26 +488,24 @@ void swap_push (struct PageInfo *tail)
                     //cprintf("ЗДАРОВА\n");
                     *tmp = (k << 12) | (*tmp & 0xFFF);
                     *tmp &= ~PTE_P;
-                    *tmp |= PTE_G;
+                    *tmp |= PTE_W;
                     page_decref(tail);
                 }
             }
         }
     }
     for (int i = 0; i < NPTENTRIES * PGSIZE; i += PGSIZE) {
-        pte_t *tmp = pgdir_walk(kern_pgdir, (void *) (0 + i), 0);
+        pte_t *tmp = pgdir_walk(kern_pgdir, page2kva(tail), 0);
         if (tmp == NULL) {
             continue;
         } else if (PTE_ADDR(*tmp) == page2pa(tail)) {
-            cprintf("ЗДАРОВА\n");
+            //cprintf("ЗДАРОВА\n");
             *tmp = (k << 12) | (*tmp & 0xFFF);
             *tmp &= ~PTE_P;
-            *tmp |= PTE_G;
+            *tmp |= PTE_W;
             page_decref(tail);
         }
     }
-    delete_from_lru_list(tail);
-    add_to_lru_list(tail);
 }
 
 //
@@ -519,6 +526,7 @@ page_free(struct PageInfo *pp)
 	if (!page_free_list_end) {
 		page_free_list_end = pp;
 	}
+	//cprintf("delete from page_free\n");
     delete_from_lru_list(pp);
 }
 
@@ -638,6 +646,7 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
     is_new_page = pp->pp_ref ? 0 : 1;
 
     if (!is_new_page) {
+        //cprintf("delete from page_insert\n");
         delete_from_lru_list(pp);
         add_to_lru_list(pp);
     }
@@ -1227,21 +1236,35 @@ static void
 check_swap(void)
 {
     cprintf("CHECK SWAP\n");
-    struct PageInfo *pp0 = page_alloc(0);
-    cprintf("Page_addr %0x\n", page2pa(pp0));
-    char *addr = page2kva(pp0);
-    memcpy(addr, "MOYA OBORONA!\n", strlen("MOYA OBORONA!\n") + 1);
+    struct PageInfo *pp0 = lru_list->tail;
+    volatile void *addr = page2kva(pp0);
+    cprintf("VA_addr %0x\n", (int) addr);
+    memmove((void *) addr, "MOYA OBORONA!\n", strlen("MOYA OBORONA!\n") + 1);
     int counter = 0;
-    struct PageInfo  *pp[4000];
+    struct PageInfo *pp[4000];
     while ((pp[counter] = page_alloc(0)) != NULL) {
+        pp[counter]->pp_ref += 1;
+        if (is_swap_full) {
+            //pp0 = pp[counter];
+            //cprintf("Page_addr %0x\n", page2pa(pp0));
+        }
         counter++;
     }
+    cprintf("lru_list->tail %0x\n", page2pa(lru_list->tail));
+
     cprintf("COUNTER = %d\n", counter);
-    cprintf("%s\n", addr);
-    for(int i = 0; i < counter; i++) {
-        page_free(pp[counter]);
+
+    pte_t *tmp = pgdir_walk(kern_pgdir, (void *) addr, 0);
+    cprintf("TMP %0x\n", *tmp);
+
+    if (*tmp & PTE_W) {
+        cprintf("*tmp & PTE_W\n");
     }
-    cprintf("HERE\n");
-    page_free(pp0);
+    cprintf("%s\n", (char *) addr);
+
+    for(int i = 0; i < counter; i++) {
+        pp[i]->pp_ref = 0;
+        page_free(pp[i]);
+    }
     cprintf("check_swap() succeeded!\n");
 }

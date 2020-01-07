@@ -110,7 +110,7 @@
 #define MMIOLIM		(KSTACKTOP - PTSIZE)
 #define MMIOBASE	(MMIOLIM - PTSIZE)
 
-#define SWAP_AMOUNT 16
+#define SWAP_AMOUNT 2
 
 #define SWAP_SIZE   (PGSIZE + sizeof(swap_info)) * SWAP_AMOUNT // 16 бит
 #define SWAP_ZONE   (MMIOBASE) - SWAP_SIZE
@@ -228,6 +228,8 @@ struct PageInfo {
 
 	uint16_t pp_ref;
 };
+
+int is_swap_full;
 
 
 
