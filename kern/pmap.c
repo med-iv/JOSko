@@ -438,7 +438,7 @@ void swap_workout()
                         envs[j].swap_pages++;
                         *tmp = (k << 12) | (*tmp & 0xFFF);
                         *tmp &= ~PTE_P;
-                        *tmp |= PTE_W;
+                        *tmp |= PTE_PWT;
                         page_decref(tail);
                     }
                 }
@@ -456,7 +456,7 @@ void swap_workout()
                 cprintf("PTE_ADDR(*tmp) %0x\n", PTE_ADDR(*tmp));
                 *tmp = (k << 12) | (*tmp & 0xFFF);
                 *tmp &= ~PTE_P;
-                *tmp |= PTE_W;
+                *tmp |= PTE_PWT;
                 page_decref(tail);
                 cprintf("*tmp %0x\n", *tmp);
             }
@@ -488,7 +488,7 @@ void swap_push (struct PageInfo *tail)
                     //cprintf("ЗДАРОВА\n");
                     *tmp = (k << 12) | (*tmp & 0xFFF);
                     *tmp &= ~PTE_P;
-                    *tmp |= PTE_W;
+                    *tmp |= PTE_PWT;
                     page_decref(tail);
                 }
             }
@@ -502,7 +502,7 @@ void swap_push (struct PageInfo *tail)
             //cprintf("ЗДАРОВА\n");
             *tmp = (k << 12) | (*tmp & 0xFFF);
             *tmp &= ~PTE_P;
-            *tmp |= PTE_W;
+            *tmp |= PTE_PWT;
             page_decref(tail);
         }
     }
@@ -1257,8 +1257,8 @@ check_swap(void)
     pte_t *tmp = pgdir_walk(kern_pgdir, (void *) addr, 0);
     cprintf("TMP %0x\n", *tmp);
 
-    if (*tmp & PTE_W) {
-        cprintf("*tmp & PTE_W\n");
+    if (*tmp & PTE_PWT) {
+        cprintf("*tmp & PTE_PWT\n");
     }
     cprintf("%s\n", (char *) addr);
 

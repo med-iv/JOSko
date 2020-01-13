@@ -338,7 +338,6 @@ region_alloc(struct Env *e, void *va, size_t len)
             panic("region_alloc: out of memory %p %u", va, len);
         }
     }
-
 }
 
 #ifdef CONFIG_KSPACE
@@ -473,7 +472,7 @@ load_icode(struct Env *e, uint8_t *binary, size_t size)
 
 	//LAB 3: Your code here.
 
-	struct Elf *elf_header = (struct Elf *) binary;
+	struct Elf *elf_header;
 
 	lcr3(PADDR(e->env_pgdir));
 	elf_header = (struct Elf *) binary;

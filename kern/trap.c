@@ -328,7 +328,7 @@ page_fault_handler(struct Trapframe *tf)
 	fault_va = rcr2();
     //cprintf("FAULT VA %u\n", fault_va);
 
-	if (fault_va & PTE_W) {
+	if (fault_va & PTE_PWT) {
 	    //cprintf("FAULT HANDLING_PTEG\n");
         pte_t *ptep = pgdir_walk(curenv->env_pgdir, (void *) fault_va, 0);
 
@@ -336,7 +336,7 @@ page_fault_handler(struct Trapframe *tf)
         int cur_size = swap_info[k].size;
         int flags = *ptep & 0xFFF;
         flags |= PTE_P;
-        flags &= ~PTE_W;
+        flags &= ~PTE_PWT;
 
         LZ4_decompress_safe(swap_info[k].buffer, CompressionBuffer, cur_size, PGSIZE);
         swap_shift(k);
